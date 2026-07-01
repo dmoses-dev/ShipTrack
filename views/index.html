@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ShipTrack Pro — Courier & Logistics</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <style>
+    .pub-nav { background:var(--ink); padding:0 2rem; display:flex; align-items:center; justify-content:space-between; height:60px; position:sticky; top:0; z-index:100; }
+    .pub-nav-brand { color:#fff; font-weight:800; font-size:1.1rem; display:flex; align-items:center; gap:.4rem; text-decoration:none; }
+    .pub-nav-links { display:flex; gap:1.5rem; list-style:none; }
+    .pub-nav-links a { color:rgba(255,255,255,.65); font-size:.875rem; font-weight:500; text-decoration:none; transition:color .15s; }
+    .pub-nav-links a:hover { color:#fff; }
+    .features-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1.25rem; padding:3rem 2rem; max-width:1100px; margin:0 auto; }
+    .feat { background:var(--white); border:1px solid var(--border); border-radius:10px; padding:1.5rem; }
+    .feat-icon { font-size:1.75rem; margin-bottom:.75rem; }
+    .feat h3 { font-weight:700; margin-bottom:.35rem; }
+    .feat p { font-size:.875rem; color:var(--ink-3); line-height:1.6; }
+    footer { background:var(--ink); color:rgba(255,255,255,.4); text-align:center; padding:2rem; font-size:.8rem; }
+  </style>
+</head>
+<body>
+<nav class="pub-nav">
+  <a class="pub-nav-brand" href="/"><span style="color:var(--steel)">▶</span> ShipTrack Pro</a>
+  <ul class="pub-nav-links">
+    <li><a href="/track">Track Shipment</a></li>
+    <li><a href="/auth/login" style="background:var(--steel);color:#fff;padding:.4rem .9rem;border-radius:6px;font-weight:600">Staff Login</a></li>
+  </ul>
+</nav>
+
+<section class="hero">
+  <div class="hero-eyebrow">🚚 Professional Logistics Platform</div>
+  <h1>Your shipments.<br/><span>Always on track.</span></h1>
+  <p>Fast, reliable courier services with real-time tracking, instant SMS/email alerts, and professional waybill generation.</p>
+  <div class="track-bar">
+    <input type="text" id="heroInput" placeholder="Enter tracking number e.g. TRK-2024-00001"/>
+    <button class="btn btn-primary" onclick="track()">Track</button>
+  </div>
+</section>
+
+<div class="stats-strip" id="statsStrip" style="display:none">
+  <div class="stat-card"><div class="stat-value" id="s-total">—</div><div class="stat-label">Shipments Handled</div></div>
+  <div class="stat-card"><div class="stat-value" id="s-transit">—</div><div class="stat-label">In Transit Now</div></div>
+  <div class="stat-card"><div class="stat-value" id="s-out">—</div><div class="stat-label">Out for Delivery</div></div>
+  <div class="stat-card"><div class="stat-value" id="s-delivered">—</div><div class="stat-label">Delivered</div></div>
+</div>
+
+<div class="features-grid">
+  <div class="feat"><div class="feat-icon">📍</div><h3>Real-Time Tracking</h3><p>Customers can track their package at every stage — from pickup to doorstep delivery — using a simple tracking number.</p></div>
+  <div class="feat"><div class="feat-icon">📲</div><h3>SMS & Email Alerts</h3><p>Automatic notifications sent to both sender and recipient at every status change. No more "where is my package?" calls.</p></div>
+  <div class="feat"><div class="feat-icon">📄</div><h3>Waybill Generation</h3><p>Professionally designed PDF waybills generated instantly for every shipment — ready to print or share digitally.</p></div>
+  <div class="feat"><div class="feat-icon">💳</div><h3>Online Payments</h3><p>Accept delivery fees via card, bank transfer, or USSD through Paystack — directly on your platform.</p></div>
+  <div class="feat"><div class="feat-icon">🛵</div><h3>Courier Assignment</h3><p>Assign riders to shipments, track their status, and manage your entire fleet from one dashboard.</p></div>
+  <div class="feat"><div class="feat-icon">🔐</div><h3>Role-Based Access</h3><p>Super Admin, Admin, Dispatcher, and Courier roles — each sees only what they need to do their job.</p></div>
+</div>
+
+<div style="background:var(--ink);text-align:center;padding:3.5rem 2rem;color:#fff">
+  <h2 style="font-size:1.75rem;font-weight:800;margin-bottom:.75rem">Ready to deliver?</h2>
+  <p style="color:rgba(255,255,255,.55);margin-bottom:1.75rem">Log in to your staff portal to start managing shipments.</p>
+  <a href="/auth/login" class="btn btn-primary" style="padding:.875rem 2rem">Go to Staff Portal</a>
+</div>
+
+<footer>
+  &copy; 2024 ShipTrack Pro. Built for professional Nigerian logistics companies.
+</footer>
+
+<script>
+function track() {
+  const val = document.getElementById('heroInput').value.trim();
+  if (val) window.location.href = '/track?q=' + encodeURIComponent(val);
+}
+document.getElementById('heroInput').addEventListener('keydown', e => { if(e.key==='Enter') track(); });
+
+fetch('/api/stats').then(r => {
+  if (!r.ok) return;
+  return r.json();
+}).then(json => {
+  if (!json?.data) return;
+  const d = json.data;
+  document.getElementById('s-total').textContent     = d.total;
+  document.getElementById('s-transit').textContent   = d.inTransit;
+  document.getElementById('s-out').textContent       = d.outForDelivery;
+  document.getElementById('s-delivered').textContent = d.delivered;
+  document.getElementById('statsStrip').style.display = '';
+}).catch(()=>{});
+</script>
+</body>
+</html>

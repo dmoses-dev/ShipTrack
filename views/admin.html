@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Shipments — ShipTrack Pro</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<script src="/js/layout.js"></script>
+
+<div class="main-content">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:1rem">
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+      <span class="topbar-title">Shipments</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-primary btn-sm" onclick="openModal('createModal')">＋ New Shipment</button>
+    </div>
+  </div>
+
+  <div class="page-body">
+
+    <!-- Stats -->
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card-pro transit"><div class="stat-icon">📦</div><div class="stat-val" id="s-total">—</div><div class="stat-lbl">Total</div></div>
+      <div class="stat-card-pro pending"><div class="stat-icon">⏳</div><div class="stat-val" id="s-pending">—</div><div class="stat-lbl">Pending</div></div>
+      <div class="stat-card-pro transit"><div class="stat-icon">🚚</div><div class="stat-val" id="s-transit">—</div><div class="stat-lbl">In Transit</div></div>
+      <div class="stat-card-pro delivered"><div class="stat-icon">✅</div><div class="stat-val" id="s-delivered">—</div><div class="stat-lbl">Delivered</div></div>
+      <div class="stat-card-pro failed"><div class="stat-icon">❌</div><div class="stat-val" id="s-failed">—</div><div class="stat-lbl">Failed</div></div>
+      <div class="stat-card-pro revenue"><div class="stat-icon">₦</div><div class="stat-val" id="s-revenue">—</div><div class="stat-lbl">Revenue (Paid)</div></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-bar">
+      <input class="filter-input" id="searchInput" placeholder="Search name, tracking, phone…" oninput="debounceLoad()" style="flex:1;min-width:200px"/>
+      <select class="filter-select" id="statusFilter" onchange="loadShipments()">
+        <option value="">All Statuses</option>
+        <option>Pending</option><option>Confirmed</option><option>Picked Up</option>
+        <option>In Transit</option><option>At Hub</option><option>Out for Delivery</option>
+        <option>Delivered</option><option>Failed</option><option>Returned</option>
+      </select>
+      <select class="filter-select" id="priorityFilter" onchange="loadShipments()">
+        <option value="">All Priorities</option>
+        <option>Standard</option><option>Express</option><option>Urgent</option><option>Same-Day</option>
+      </select>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Tracking</th><th>Sender</th><th>Recipient</th>
+          <th>Description</th><th>Priority</th><th>Courier</th>
+          <th>Status</th><th>Fee</th><th>Payment</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="tableBody">
+          <tr><td colspan="10" style="text-align:center;padding:3rem;color:var(--ink-3)">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="pagination" style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem"></div>
+  </div>
+</div>
+
+<!-- CREATE MODAL -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <span class="modal-title">New Shipment</span>
+      <button class="modal-close" onclick="closeModal('createModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-section-label">Sender</div>
+        <div class="form-group"><label>Full Name *</label><input id="c-sName" type="text" placeholder="Company or person"/></div>
+        <div class="form-group"><label>Phone *</label><input id="c-sPhone" type="tel" placeholder="+234 800 000 0000"/></div>
+        <div class="form-group"><label>Email</label><input id="c-sEmail" type="text" placeholder="optional"/></div>
+        <div class="form-group"><label>City</label><input id="c-sCity" type="text" placeholder="Lagos"/></div>
+        <div class="form-group form-full"><label>Address *</label><input id="c-sAddr" type="text" placeholder="Street address"/></div>
+
+        <div class="form-section-label">Recipient</div>
+        <div class="form-group"><label>Full Name *</label><input id="c-rName" type="text" placeholder="Full name"/></div>
+        <div class="form-group"><label>Phone *</label><input id="c-rPhone" type="tel" placeholder="+234 800 000 0000"/></div>
+        <div class="form-group"><label>Email</label><input id="c-rEmail" type="text" placeholder="optional (for email alerts)"/></div>
+        <div class="form-group"><label>City</label><input id="c-rCity" type="text" placeholder="Abuja"/></div>
+        <div class="form-group form-full"><label>Address *</label><input id="c-rAddr" type="text" placeholder="Street address"/></div>
+
+        <div class="form-section-label">Package</div>
+        <div class="form-group form-full"><label>Description *</label><input id="c-desc" type="text" placeholder="e.g. Electronics – Laptop"/></div>
+        <div class="form-group"><label>Package Type</label>
+          <select id="c-pkgType">
+            <option>Parcel</option><option>Document</option><option>Fragile</option>
+            <option>Food</option><option>Electronics</option><option>Other</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Priority</label>
+          <select id="c-priority">
+            <option>Standard</option><option>Express</option><option>Urgent</option><option>Same-Day</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Weight (kg)</label><input id="c-weight" type="text" placeholder="2.5"/></div>
+        <div class="form-group"><label>Quantity</label><input id="c-qty" type="number" value="1" min="1"/></div>
+        <div class="form-group"><label>Delivery Fee (₦)</label><input id="c-fee" type="number" placeholder="2500"/></div>
+        <div class="form-group"><label>Payment Method</label>
+          <select id="c-payMethod">
+            <option>Cash</option><option>Transfer</option><option>Card</option><option>Paystack</option>
+          </select>
+        </div>
+        <div class="form-group form-full"><label>Notes</label><input id="c-notes" type="text" placeholder="Special handling instructions…"/></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn" style="border:1.5px solid var(--border);color:var(--ink-3)" onclick="closeModal('createModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="createShipment()">Create Shipment</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <span class="modal-title" id="detailTitle">Shipment</span>
+      <button class="modal-close" onclick="closeModal('detailModal')">✕</button>
+    </div>
+    <div class="modal-body" id="detailBody">Loading…</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STATUSES = ['Pending','Confirmed','Picked Up','In Transit','At Hub','Out for Delivery','Delivered','Failed','Returned'];
+let currentPage = 1;
+let debTimer;
+
+function debounceLoad() { clearTimeout(debTimer); debTimer = setTimeout(loadShipments, 350); }
+
+function badgeClass(s) {
+  return {'Pending':'badge-pending','Picked Up':'badge-picked-up','In Transit':'badge-in-transit',
+    'At Hub':'badge-in-transit','Confirmed':'badge-picked-up',
+    'Out for Delivery':'badge-out','Delivered':'badge-delivered','Failed':'badge-failed','Returned':'badge-failed'}[s]||'';
+}
+function payClass(s) { return {'Paid':'pay-paid','Unpaid':'pay-unpaid','Waived':'pay-waived'}[s]||''; }
+function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'; }
+function fmtDT(d)   { return d ? new Date(d).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '—'; }
+function fmtMoney(n){ return '₦' + Number(n||0).toLocaleString(); }
+
+async function loadStats() {
+  const { data: d } = await fetch('/api/shipments/meta/stats').then(r=>r.json());
+  document.getElementById('s-total').textContent     = d.total;
+  document.getElementById('s-pending').textContent   = d.pending;
+  document.getElementById('s-transit').textContent   = d.inTransit;
+  document.getElementById('s-delivered').textContent = d.delivered;
+  document.getElementById('s-failed').textContent    = d.failed;
+  document.getElementById('s-revenue').textContent   = fmtMoney(d.revenue);
+}
+
+async function loadShipments(page = 1) {
+  currentPage = page;
+  const params = new URLSearchParams({
+    page,
+    search:   document.getElementById('searchInput').value,
+    status:   document.getElementById('statusFilter').value,
+    priority: document.getElementById('priorityFilter').value,
+  });
+
+  const { data, total } = await fetch('/api/shipments?' + params).then(r => r.json());
+  const tbody = document.getElementById('tableBody');
+
+  if (!data?.length) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">No shipments found</div></div></td></tr>`;
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = data.map(s => `
+    <tr>
+      <td><span class="tracking-id">${s.trackingNumber}</span></td>
+      <td>${s.sender.name}<br/><small style="color:var(--ink-3)">${s.sender.city||''}</small></td>
+      <td>${s.recipient.name}<br/><small style="color:var(--ink-3)">${s.recipient.city||''}</small></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.description}">${s.description}</td>
+      <td><span style="font-size:.8rem;font-weight:600" class="${s.priority==='Urgent'?'priority-urgent':s.priority==='Express'?'priority-express':'priority-standard'}">${s.priority}</span></td>
+      <td>${s.courier ? `<span class="courier-chip">🛵 ${s.courier.name}</span>` : '<span style="color:var(--ink-3);font-size:.8rem">Unassigned</span>'}</td>
+      <td><span class="badge ${badgeClass(s.status)}">${s.status}</span></td>
+      <td style="font-family:'DM Mono',monospace;font-size:.8rem">${fmtMoney(s.deliveryFee)}</td>
+      <td><span class="badge ${payClass(s.paymentStatus)}">${s.paymentStatus}</span></td>
+      <td>
+        <div class="actions-cell">
+          <button class="btn btn-sm" style="background:var(--steel-lt);color:var(--steel)" onclick="openDetail('${s._id}')">View</button>
+          <a class="btn btn-sm" style="background:#f0fdf4;color:#166534" href="/api/shipments/${s._id}/waybill" target="_blank">PDF</a>
+          <button class="btn btn-sm btn-danger" onclick="deleteShipment('${s._id}')">Del</button>
+        </div>
+      </td>
+    </tr>`).join('');
+
+  // Pagination
+  const pages = Math.ceil(total / 25);
+  if (pages > 1) {
+    document.getElementById('pagination').innerHTML = Array.from({length: pages}, (_, i) =>
+      `<button class="btn btn-sm ${i+1===page?'btn-primary':''}" onclick="loadShipments(${i+1})" style="${i+1!==page?'border:1px solid var(--border)':''}">${i+1}</button>`
+    ).join('');
+  }
+}
+
+async function openDetail(id) {
+  openModal('detailModal');
+  document.getElementById('detailBody').innerHTML = '<div style="text-align:center;padding:2rem;color:var(--ink-3)">Loading…</div>';
+  const { data: s } = await fetch(`/api/shipments/${id}`).then(r => r.json());
+  const couriers = await fetch('/api/couriers').then(r => r.json());
+
+  document.getElementById('detailTitle').textContent = s.trackingNumber;
+  document.getElementById('detailBody').innerHTML = `
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab(this,'tab-info')">Info</div>
+      <div class="tab" onclick="switchTab(this,'tab-update')">Update</div>
+      <div class="tab" onclick="switchTab(this,'tab-payment')">Payment</div>
+      <div class="tab" onclick="switchTab(this,'tab-history')">History</div>
+    </div>
+
+    <!-- INFO TAB -->
+    <div id="tab-info">
+      <div class="detail-grid">
+        <div class="detail-card">
+          <div class="detail-card-title">Sender</div>
+          <div class="detail-name">${s.sender.name}</div>
+          <div class="detail-line">${s.sender.address}</div>
+          <div class="detail-line">${s.sender.city||''} ${s.sender.state||''}</div>
+          <div class="detail-line">${s.sender.phone}</div>
+          <div class="detail-line">${s.sender.email||''}</div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-card-title">Recipient</div>
+          <div class="detail-name">${s.recipient.name}</div>
+          <div class="detail-line">${s.recipient.address}</div>
+          <div class="detail-line">${s.recipient.city||''} ${s.recipient.state||''}</div>
+          <div class="detail-line">${s.recipient.phone}</div>
+          <div class="detail-line">${s.recipient.email||''}</div>
+        </div>
+      </div>
+      <div class="detail-card" style="margin-bottom:1rem">
+        <div class="detail-card-title">Package</div>
+        <div class="detail-name">${s.description}</div>
+        <div class="detail-line">Type: ${s.packageType} &nbsp;·&nbsp; Priority: <strong>${s.priority}</strong> &nbsp;·&nbsp; Weight: ${s.weight||'—'}kg &nbsp;·&nbsp; Qty: ${s.quantity}</div>
+        <div class="detail-line">Est. Delivery: ${fmtDate(s.estimatedDelivery)}</div>
+        ${s.deliveredAt ? `<div class="detail-line" style="color:var(--status-delivered)">Delivered: ${fmtDT(s.deliveredAt)}</div>` : ''}
+        ${s.notes ? `<div class="detail-line" style="margin-top:.4rem;font-style:italic">${s.notes}</div>` : ''}
+      </div>
+      <div class="detail-card">
+        <div class="detail-card-title">Current Status</div>
+        <span class="badge ${badgeClass(s.status)}" style="margin:.25rem 0">${s.status}</span>
+        <div class="detail-line" style="margin-top:.5rem">Courier: ${s.courier ? `${s.courier.name} · ${s.courier.phone}` : 'Unassigned'}</div>
+        <div class="detail-line">Created by: ${s.createdBy?.name||'—'} on ${fmtDT(s.createdAt)}</div>
+      </div>
+    </div>
+
+    <!-- UPDATE TAB -->
+    <div id="tab-update" style="display:none">
+      <div class="form-grid">
+        <div class="form-group form-full">
+          <label>New Status</label>
+          <select id="u-status">
+            ${STATUSES.map(st=>`<option value="${st}" ${st===s.status?'selected':''}>${st}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group form-full">
+          <label>Location (optional)</label>
+          <input id="u-location" type="text" placeholder="e.g. Lagos Hub, Abuja Depot"/>
+        </div>
+        <div class="form-group form-full">
+          <label>Note</label>
+          <input id="u-note" type="text" placeholder="What happened?"/>
+        </div>
+        <div class="form-group form-full">
+          <label>Assign Courier</label>
+          <select id="u-courier">
+            <option value="">— Keep current —</option>
+            ${(couriers.data||[]).map(c=>`<option value="${c._id}" ${s.courier?._id===c._id?'selected':''}>${c.name} (${c.status}) · ${c.vehicleType}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="updateStatus('${s._id}')">Save Update</button>
+      </div>
+    </div>
+
+    <!-- PAYMENT TAB -->
+    <div id="tab-payment" style="display:none">
+      <div class="form-grid">
+        <div class="form-group"><label>Delivery Fee (₦)</label>
+          <input id="p-fee" type="number" value="${s.deliveryFee||0}"/>
+        </div>
+        <div class="form-group"><label>Payment Status</label>
+          <select id="p-status">
+            <option ${s.paymentStatus==='Unpaid'?'selected':''}>Unpaid</option>
+            <option ${s.paymentStatus==='Paid'?'selected':''}>Paid</option>
+            <option ${s.paymentStatus==='Waived'?'selected':''}>Waived</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Payment Method</label>
+          <select id="p-method">
+            ${['Cash','Transfer','Card','Paystack'].map(m=>`<option ${s.paymentMethod===m?'selected':''}>${m}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label>Payment Reference</label>
+          <input id="p-ref" type="text" value="${s.paymentRef||''}" placeholder="Optional ref/receipt no."/>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="updatePayment('${s._id}')">Save Payment</button>
+      </div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div id="tab-history" style="display:none">
+      <div class="timeline" style="margin-top:.5rem">
+        ${(s.history||[]).slice().reverse().map(h=>`
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+              <div class="timeline-status">${h.status}</div>
+              ${h.location?`<div class="timeline-note">📍 ${h.location}</div>`:''}
+              ${h.note?`<div class="timeline-note">${h.note}</div>`:''}
+              <div class="timeline-time">${fmtDT(h.timestamp)}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function switchTab(el, tabId) {
+  el.closest('.modal-body').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  ['tab-info','tab-update','tab-payment','tab-history'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = id === tabId ? '' : 'none';
+  });
+}
+
+async function updateStatus(id) {
+  const status   = document.getElementById('u-status').value;
+  const note     = document.getElementById('u-note').value;
+  const location = document.getElementById('u-location').value;
+  const courierId= document.getElementById('u-courier').value;
+
+  const res = await fetch(`/api/shipments/${id}/status`, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ status, note, location })
+  }).then(r => r.json());
+
+  if (!res.success) return showToast(res.message, 'error');
+
+  if (courierId) {
+    await fetch(`/api/shipments/${id}/assign`, {
+      method: 'PATCH', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ courierId })
+    });
+  }
+
+  showToast('Shipment updated', 'success');
+  closeModal('detailModal');
+  loadShipments(currentPage);
+  loadStats();
+}
+
+async function updatePayment(id) {
+  const res = await fetch(`/api/shipments/${id}/payment`, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      paymentStatus: document.getElementById('p-status').value,
+      paymentMethod: document.getElementById('p-method').value,
+      paymentRef:    document.getElementById('p-ref').value,
+    })
+  }).then(r => r.json());
+  if (res.success) { showToast('Payment updated', 'success'); closeModal('detailModal'); loadShipments(currentPage); loadStats(); }
+  else showToast(res.message, 'error');
+}
+
+async function createShipment() {
+  const body = {
+    sender:    { name:document.getElementById('c-sName').value, phone:document.getElementById('c-sPhone').value, email:document.getElementById('c-sEmail').value, address:document.getElementById('c-sAddr').value, city:document.getElementById('c-sCity').value },
+    recipient: { name:document.getElementById('c-rName').value, phone:document.getElementById('c-rPhone').value, email:document.getElementById('c-rEmail').value, address:document.getElementById('c-rAddr').value, city:document.getElementById('c-rCity').value },
+    description:  document.getElementById('c-desc').value,
+    packageType:  document.getElementById('c-pkgType').value,
+    priority:     document.getElementById('c-priority').value,
+    weight:       parseFloat(document.getElementById('c-weight').value)||undefined,
+    quantity:     parseInt(document.getElementById('c-qty').value)||1,
+    deliveryFee:  parseFloat(document.getElementById('c-fee').value)||0,
+    paymentMethod:document.getElementById('c-payMethod').value,
+    notes:        document.getElementById('c-notes').value,
+  };
+  if (!body.sender.name||!body.recipient.name||!body.description) return showToast('Fill in required fields','error');
+  const res = await fetch('/api/shipments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
+  if (res.success) { showToast('Shipment created: ' + res.data.trackingNumber,'success'); closeModal('createModal'); loadShipments(); loadStats(); }
+  else showToast(res.message,'error');
+}
+
+async function deleteShipment(id) {
+  if (!confirm('Delete this shipment permanently?')) return;
+  const res = await fetch(`/api/shipments/${id}`,{method:'DELETE'}).then(r=>r.json());
+  if (res.success) { showToast('Deleted','success'); loadShipments(currentPage); loadStats(); }
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(el =>
+  el.addEventListener('click', e => { if (e.target===el) el.classList.remove('open'); })
+);
+
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+loadStats();
+loadShipments();
+</script>
+</body>
+</html>

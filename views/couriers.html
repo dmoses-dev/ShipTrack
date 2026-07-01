@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Couriers — ShipTrack Pro</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<script src="/js/layout.js"></script>
+<div class="main-content">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:1rem">
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+      <span class="topbar-title">Couriers & Riders</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-primary btn-sm" onclick="openModal('addModal')">＋ Add Courier</button>
+    </div>
+  </div>
+  <div class="page-body">
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);max-width:500px">
+      <div class="stat-card-pro delivered"><div class="stat-icon">🟢</div><div class="stat-val" id="c-avail">—</div><div class="stat-lbl">Available</div></div>
+      <div class="stat-card-pro transit"><div class="stat-icon">🔵</div><div class="stat-val" id="c-busy">—</div><div class="stat-lbl">Busy</div></div>
+      <div class="stat-card-pro failed"><div class="stat-icon">⚫</div><div class="stat-val" id="c-offline">—</div><div class="stat-lbl">Offline</div></div>
+    </div>
+
+    <div class="filter-bar">
+      <select class="filter-select" id="statusFilter" onchange="loadCouriers()">
+        <option value="">All Statuses</option>
+        <option>Available</option><option>Busy</option><option>Offline</option>
+      </select>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Name</th><th>Phone</th><th>Vehicle</th><th>Plate</th>
+          <th>Zone</th><th>Status</th><th>Deliveries</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="tableBody">
+          <tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--ink-3)">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Add Courier</span>
+      <button class="modal-close" onclick="closeModal('addModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Full Name *</label><input id="a-name" type="text" placeholder="Rider name"/></div>
+        <div class="form-group"><label>Phone *</label><input id="a-phone" type="tel" placeholder="+234 800 000 0000"/></div>
+        <div class="form-group"><label>Email</label><input id="a-email" type="text" placeholder="optional"/></div>
+        <div class="form-group"><label>Vehicle Type</label>
+          <select id="a-vehicle"><option>Motorcycle</option><option>Bicycle</option><option>Car</option><option>Van</option><option>Truck</option></select>
+        </div>
+        <div class="form-group"><label>Plate Number</label><input id="a-plate" type="text" placeholder="e.g. LAG-234-AA"/></div>
+        <div class="form-group"><label>Zone / Area</label><input id="a-zone" type="text" placeholder="e.g. Lagos Island"/></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn" style="border:1.5px solid var(--border);color:var(--ink-3)" onclick="closeModal('addModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="addCourier()">Add Courier</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Edit Courier</span>
+      <button class="modal-close" onclick="closeModal('editModal')">✕</button>
+    </div>
+    <div class="modal-body" id="editBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+function statusDot(s) { return {'Available':'🟢','Busy':'🔵','Offline':'⚫'}[s]||''; }
+
+async function loadCouriers() {
+  const status = document.getElementById('statusFilter').value;
+  const params = status ? '?status=' + status : '';
+  const { data } = await fetch('/api/couriers' + params).then(r => r.json());
+  const tbody = document.getElementById('tableBody');
+
+  // stats
+  const avail   = data.filter(c=>c.status==='Available').length;
+  const busy    = data.filter(c=>c.status==='Busy').length;
+  const offline = data.filter(c=>c.status==='Offline').length;
+  document.getElementById('c-avail').textContent   = avail;
+  document.getElementById('c-busy').textContent    = busy;
+  document.getElementById('c-offline').textContent = offline;
+
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🛵</div><div class="empty-title">No couriers yet</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(c => `<tr>
+    <td><strong>${c.name}</strong></td>
+    <td>${c.phone}</td>
+    <td>${c.vehicleType}</td>
+    <td style="font-family:'DM Mono',monospace;font-size:.8rem">${c.vehiclePlate||'—'}</td>
+    <td>${c.zone||'—'}</td>
+    <td><span class="badge ${c.status==='Available'?'badge-delivered':c.status==='Busy'?'badge-in-transit':'badge-failed'}">${statusDot(c.status)} ${c.status}</span></td>
+    <td>${c.totalDeliveries}</td>
+    <td>
+      <div class="actions-cell">
+        <button class="btn btn-sm" style="background:var(--steel-lt);color:var(--steel)" onclick="editCourier('${c._id}','${c.name}','${c.phone}','${c.vehicleType}','${c.status}','${c.zone||''}','${c.vehiclePlate||''}')">Edit</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteCourier('${c._id}')">Remove</button>
+      </div>
+    </td>
+  </tr>`).join('');
+}
+
+async function addCourier() {
+  const body = { name:document.getElementById('a-name').value, phone:document.getElementById('a-phone').value, email:document.getElementById('a-email').value, vehicleType:document.getElementById('a-vehicle').value, vehiclePlate:document.getElementById('a-plate').value, zone:document.getElementById('a-zone').value };
+  if (!body.name||!body.phone) return showToast('Name and phone required','error');
+  const res = await fetch('/api/couriers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
+  if (res.success) { showToast('Courier added','success'); closeModal('addModal'); loadCouriers(); }
+  else showToast(res.message,'error');
+}
+
+function editCourier(id, name, phone, vehicleType, status, zone, plate) {
+  document.getElementById('editBody').innerHTML = `
+    <div class="form-grid">
+      <div class="form-group"><label>Name</label><input id="e-name" type="text" value="${name}"/></div>
+      <div class="form-group"><label>Phone</label><input id="e-phone" type="tel" value="${phone}"/></div>
+      <div class="form-group"><label>Vehicle</label>
+        <select id="e-vehicle">
+          ${['Motorcycle','Bicycle','Car','Van','Truck'].map(v=>`<option ${v===vehicleType?'selected':''}>${v}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Status</label>
+        <select id="e-status">
+          ${['Available','Busy','Offline'].map(s=>`<option ${s===status?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Plate</label><input id="e-plate" type="text" value="${plate}"/></div>
+      <div class="form-group"><label>Zone</label><input id="e-zone" type="text" value="${zone}"/></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" style="border:1.5px solid var(--border);color:var(--ink-3)" onclick="closeModal('editModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCourier('${id}')">Save Changes</button>
+    </div>`;
+  openModal('editModal');
+}
+
+async function saveCourier(id) {
+  const body = { name:document.getElementById('e-name').value, phone:document.getElementById('e-phone').value, vehicleType:document.getElementById('e-vehicle').value, status:document.getElementById('e-status').value, vehiclePlate:document.getElementById('e-plate').value, zone:document.getElementById('e-zone').value };
+  const res = await fetch(`/api/couriers/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
+  if (res.success) { showToast('Courier updated','success'); closeModal('editModal'); loadCouriers(); }
+  else showToast(res.message,'error');
+}
+
+async function deleteCourier(id) {
+  if (!confirm('Remove this courier?')) return;
+  const res = await fetch(`/api/couriers/${id}`,{method:'DELETE'}).then(r=>r.json());
+  if (res.success) { showToast('Removed','success'); loadCouriers(); }
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');}));
+function showToast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),3500);}
+loadCouriers();
+</script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Track Shipment — ShipTrack Pro</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <style>
+    .pub-nav { background:var(--ink); padding:0 2rem; display:flex; align-items:center; justify-content:space-between; height:60px; }
+    .pub-nav-brand { color:#fff; font-weight:800; font-size:1.1rem; display:flex; align-items:center; gap:.4rem; text-decoration:none; }
+  </style>
+</head>
+<body>
+<nav class="pub-nav">
+  <a class="pub-nav-brand" href="/"><span style="color:var(--steel)">▶</span> ShipTrack Pro</a>
+  <a href="/" style="color:rgba(255,255,255,.6);font-size:.875rem;text-decoration:none">← Home</a>
+</nav>
+
+<div class="track-page">
+  <div style="width:100%;max-width:600px;margin-bottom:1.5rem">
+    <h1 style="font-size:1.75rem;font-weight:800;letter-spacing:-.02em;margin-bottom:.25rem">Track your shipment</h1>
+    <p style="color:var(--ink-3);font-size:.9rem">Enter your tracking number to see live status and history.</p>
+  </div>
+  <div style="width:100%;max-width:600px;display:flex;gap:.75rem;margin-bottom:2rem">
+    <input type="text" id="trackInput" placeholder="TRK-2024-00001" style="flex:1;padding:.875rem 1.25rem;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Mono',monospace;font-size:.95rem;outline:none;transition:border-color .2s" onfocus="this.style.borderColor='var(--steel)'" onblur="this.style.borderColor='var(--border)'"/>
+    <button class="btn btn-primary" onclick="trackShipment()">Track</button>
+  </div>
+  <div id="result" style="width:100%;max-width:600px"></div>
+</div>
+
+<script>
+function badgeClass(s) {
+  return {'Pending':'badge-pending','Picked Up':'badge-picked-up','In Transit':'badge-in-transit',
+    'At Hub':'badge-in-transit','Confirmed':'badge-picked-up',
+    'Out for Delivery':'badge-out','Delivered':'badge-delivered','Failed':'badge-failed','Returned':'badge-failed'}[s]||'';
+}
+function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) : '—'; }
+function fmtDT(d)   { return d ? new Date(d).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '—'; }
+
+async function trackShipment() {
+  const q = document.getElementById('trackInput').value.trim().toUpperCase();
+  if (!q) return;
+  history.replaceState({}, '', '/track?q=' + encodeURIComponent(q));
+  const result = document.getElementById('result');
+  result.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--ink-3)">Searching…</div>`;
+
+  const r = await fetch(`/api/shipments/track/${encodeURIComponent(q)}`);
+  if (!r.ok) {
+    result.innerHTML = `<div class="track-card"><div class="track-card-header" style="background:#7f1d1d">
+      <div class="track-number">${q}</div><div class="track-status-big">Not Found</div></div>
+      <div class="track-card-body"><p style="color:var(--ink-3)">No shipment found. Please double-check the tracking number.</p></div></div>`;
+    return;
+  }
+
+  const { data: s } = await r.json();
+  const headerBg = s.status==='Delivered'?'#064e3b':s.status==='Failed'||s.status==='Returned'?'#7f1d1d':'var(--ink)';
+  const isPaid = s.paymentStatus === 'Paid';
+
+  result.innerHTML = `
+    <div class="track-card">
+      <div class="track-card-header" style="background:${headerBg}">
+        <div class="track-number">${s.trackingNumber}</div>
+        <div class="track-status-big">${s.status}</div>
+        <div style="margin-top:.35rem;color:rgba(255,255,255,.55);font-size:.85rem">Est. delivery: ${fmtDate(s.estimatedDelivery)}</div>
+        ${s.deliveredAt ? `<div style="color:#6ee7b7;font-size:.85rem;margin-top:.15rem">✅ Delivered ${fmtDT(s.deliveredAt)}</div>` : ''}
+      </div>
+      <div class="track-card-body">
+
+        <div class="detail-grid" style="margin-bottom:1.25rem">
+          <div class="detail-card">
+            <div class="detail-card-title">From</div>
+            <div class="detail-name">${s.sender.name}</div>
+            <div class="detail-line">${s.sender.city||''} ${s.sender.state||''}</div>
+          </div>
+          <div class="detail-card">
+            <div class="detail-card-title">To</div>
+            <div class="detail-name">${s.recipient.name}</div>
+            <div class="detail-line">${s.recipient.city||''} ${s.recipient.state||''}</div>
+          </div>
+        </div>
+
+        <div class="detail-card" style="margin-bottom:1.25rem">
+          <div class="detail-card-title">Package</div>
+          <div class="detail-name">${s.description}</div>
+          <div class="detail-line">Type: ${s.packageType} &nbsp;·&nbsp; Priority: <strong>${s.priority}</strong></div>
+          ${s.courier ? `<div class="detail-line" style="margin-top:.4rem">🛵 Courier: <strong>${s.courier.name}</strong> · ${s.courier.phone}</div>` : ''}
+        </div>
+
+        <div class="detail-card-title" style="margin-bottom:.75rem">Tracking History</div>
+        <div class="timeline">
+          ${(s.history||[]).slice().reverse().map(h=>`
+            <div class="timeline-item">
+              <div class="timeline-dot"></div>
+              <div class="timeline-content">
+                <div class="timeline-status">${h.status}</div>
+                ${h.location?`<div class="timeline-note">📍 ${h.location}</div>`:''}
+                ${h.note?`<div class="timeline-note">${h.note}</div>`:''}
+                <div class="timeline-time">${fmtDT(h.timestamp)}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+// Auto-track from URL
+const q = new URLSearchParams(window.location.search).get('q');
+if (q) { document.getElementById('trackInput').value = q; trackShipment(); }
+document.getElementById('trackInput').addEventListener('keydown', e => { if(e.key==='Enter') trackShipment(); });
+
+// Paid confirmation
+const p = new URLSearchParams(window.location.search);
+if (p.get('paid')) {
+  const t = document.createElement('div');
+  t.className = 'toast success show';
+  t.textContent = '✅ Payment confirmed! Your shipment is now active.';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 5000);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Staff — ShipTrack Pro</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<script src="/js/layout.js"></script>
+<div class="main-content">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:1rem">
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+      <span class="topbar-title">Staff Accounts</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-primary btn-sm" onclick="openModal('addModal')">＋ Add Staff</button>
+    </div>
+  </div>
+  <div class="page-body">
+    <p style="color:var(--ink-3);font-size:.875rem;margin-bottom:1.25rem">
+      Manage who can log in to the staff portal. Only Super Admins and Admins can create accounts.
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Name</th><th>Email</th><th>Role</th><th>Phone</th><th>Last Login</th><th>Status</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="tableBody">
+          <tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--ink-3)">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Add Staff Account</span>
+      <button class="modal-close" onclick="closeModal('addModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="formMsg" style="display:none;margin-bottom:1rem;padding:.75rem 1rem;border-radius:8px;font-size:.85rem"></div>
+      <div class="form-grid">
+        <div class="form-group"><label>Full Name *</label><input id="a-name" type="text" placeholder="Staff name"/></div>
+        <div class="form-group"><label>Phone</label><input id="a-phone" type="tel" placeholder="+234 800 000 0000"/></div>
+        <div class="form-group"><label>Email *</label><input id="a-email" type="text" placeholder="staff@company.com"/></div>
+        <div class="form-group"><label>Password *</label><input id="a-pass" type="password" placeholder="Min 6 characters"/></div>
+        <div class="form-group form-full">
+          <label>Role</label>
+          <select id="a-role">
+            <option value="dispatcher">Dispatcher — create & update shipments</option>
+            <option value="admin">Admin — full access except user deletion</option>
+            <option value="courier">Courier — view assigned jobs</option>
+            <option value="superadmin">Super Admin — complete access</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn" style="border:1.5px solid var(--border);color:var(--ink-3)" onclick="closeModal('addModal')">Cancel</button>
+        <button class="btn btn-primary" id="createBtn" onclick="addUser()">Create Account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+function fmtDT(d) { return d ? new Date(d).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : 'Never'; }
+
+const ROLE_BADGE = {
+  superadmin: 'background:#e0e7ff;color:#3730a3',
+  admin:      'background:#dbeafe;color:#1e3a8a',
+  dispatcher: 'background:#d1fae5;color:#064e3b',
+  courier:    'background:#fef3c7;color:#92400e',
+};
+
+async function loadUsers() {
+  try {
+    const { data } = await fetch('/auth/users/list').then(r => r.json());
+    const tbody = document.getElementById('tableBody');
+    if (!data?.length) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">👤</div><div class="empty-title">No staff accounts yet</div><div class="empty-sub">Add your first team member above.</div></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = data.map(u => `
+      <tr>
+        <td><strong>${u.name}</strong></td>
+        <td style="font-size:.85rem;font-family:'DM Mono',monospace">${u.email}</td>
+        <td><span style="display:inline-block;padding:.2rem .65rem;border-radius:100px;font-size:.72rem;font-weight:600;${ROLE_BADGE[u.role]||''}">${u.role}</span></td>
+        <td>${u.phone||'—'}</td>
+        <td style="font-size:.8rem;color:var(--ink-3)">${fmtDT(u.lastLogin)}</td>
+        <td><span class="badge ${u.isActive?'badge-delivered':'badge-failed'}">${u.isActive?'Active':'Inactive'}</span></td>
+        <td>
+          <button class="btn btn-sm btn-danger" onclick="removeUser('${u._id}','${u.name}')">Remove</button>
+        </td>
+      </tr>`).join('');
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+async function addUser() {
+  const btn = document.getElementById('createBtn');
+  const name     = document.getElementById('a-name').value.trim();
+  const email    = document.getElementById('a-email').value.trim();
+  const password = document.getElementById('a-pass').value;
+  const role     = document.getElementById('a-role').value;
+  const phone    = document.getElementById('a-phone').value.trim();
+
+  if (!name || !email || !password) return showMsg('Name, email and password are required.', 'error');
+  if (password.length < 6) return showMsg('Password must be at least 6 characters.', 'error');
+
+  btn.textContent = 'Creating…'; btn.disabled = true;
+
+  // Use the POST form-style endpoint via fetch
+  const formData = new URLSearchParams({ name, email, password, role, phone });
+  try {
+    const res = await fetch('/auth/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData,
+      redirect: 'manual', // catch the redirect
+    });
+    // 302 redirect = success, non-302 = error
+    showToast(`Account created for ${name}`, 'success');
+    closeModal('addModal');
+    loadUsers();
+    // Reset fields
+    ['a-name','a-email','a-pass','a-phone'].forEach(id => document.getElementById(id).value = '');
+  } catch(e) {
+    showMsg('Something went wrong. Try again.', 'error');
+  } finally {
+    btn.textContent = 'Create Account'; btn.disabled = false;
+  }
+}
+
+async function removeUser(id, name) {
+  if (!confirm(`Remove ${name}?\n\nThey will no longer be able to log in. This cannot be undone.`)) return;
+  const res = await fetch(`/auth/users/${id}`, { method: 'DELETE' }).then(r => r.json());
+  if (res.success) { showToast(`${name} removed`, 'success'); loadUsers(); }
+  else showToast(res.message || 'Error removing user', 'error');
+}
+
+function showMsg(msg, type) {
+  const el = document.getElementById('formMsg');
+  el.style.cssText = `display:block;background:${type==='error'?'#fef2f2':'#f0fdf4'};color:${type==='error'?'#7f1d1d':'#064e3b'};border:1px solid ${type==='error'?'#fecaca':'#bbf7d0'};`;
+  el.textContent = msg;
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); document.getElementById('formMsg').style.display='none'; }
+document.querySelectorAll('.modal-overlay').forEach(el => el.addEventListener('click', e => { if(e.target===el) el.classList.remove('open'); }));
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+loadUsers();
+</script>
+</body>
+</html>
